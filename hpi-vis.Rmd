@@ -1,0 +1,510 @@
+---
+title: "data-vis"
+output: html_document
+---
+
+Start by loading the tidyverse packages
+
+```{r setup, message = FALSE, warning = FALSE}
+# see https://www.tidyverse.org/packages/
+# if not installed yet, run install.packages first
+# install.package("gganimate")
+# install.package("gifski")
+# install.package("png")
+# install.package("plotly")
+# install.package("highcharter")
+# install.package("corrrplot")
+
+library(tidyverse) 
+library(timetk)
+library(highcharter)
+library(readxl)
+library(corrplot)
+library(scales)
+library(plotly)
+library(lubridate)
+library(janitor)
+library(plotly)
+library(highcharter)
+library(gganimate)
+library(gifski)
+library(png)
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, comment = NA)
+```
+
+### Data visualization with ggplot
+    
+
+https://ggplot2.tidyverse.org/
+
+A little background
+
+    + part of the tidyverse and works well with tidy data
+    + grammar of graphics
+    + most popular data vis package
+    + layers and geoms
+    + my strong opinion: skip learning base R visualization tools :) 
+
+### Start by loading and wrangling data
+
+
+```{r}
+library(readxl)
+url <- "http://www.freddiemac.com/fmac-resources/research/docs/State_and_US_SA.xls"
+destfile <- "State_and_US_SA.xls"
+curl::curl_download(url, destfile)
+
+states_hpi <- read_excel(destfile, col_types = c("text", 
+    "numeric", "numeric", "numeric", "numeric", 
+    "numeric", "numeric", "numeric", "numeric", 
+    "numeric", "numeric", "numeric", "numeric", 
+    "numeric", "numeric", "numeric", "numeric", 
+    "numeric", "numeric", "numeric", "numeric", 
+    "numeric", "numeric", "numeric", "numeric", 
+    "numeric", "numeric", "numeric", "numeric", 
+    "numeric", "numeric", "numeric", "numeric", 
+    "numeric", "numeric", "numeric", "numeric", 
+    "numeric", "numeric", "numeric", "numeric", 
+    "numeric", "numeric", "numeric", "numeric", 
+    "numeric", "numeric", "numeric", "numeric", 
+    "numeric", "numeric", "numeric", "numeric"), 
+    skip = 5)
+
+states_hpi_wrangled <- 
+  states_hpi %>% 
+  # clean up column names from janitor package
+  clean_names() %>% 
+  slice(1:535) %>% 
+  mutate(date = ymd(parse_date_time(month, "%Y%m"))) %>%
+  select(date, contains("united"),  everything(), -month) %>% 
+  rename(wash_dc = dc, usa = united_states_seasonally_adjusted) 
+
+
+hpi_tidy <- 
+  states_hpi_wrangled %>% 
+  gather(state, hpi, -date) %>% 
+  group_by(state)
+
+hpi_pct <- 
+  hpi_tidy %>% 
+  group_by(state) %>% 
+  mutate(pct_change = (hpi / lag(hpi)) - 1,
+         pct_change_12_mons = (hpi / lag(hpi, 12)) - 1) %>%
+  na.omit()
+
+hpi_pct %>% 
+  head()
+```
+
+### First ggplot!
+
+
+```{r}
+hpi_pct %>% 
+  ggplot(aes(x = date, y = pct_change, color = state))
+ # ggplot(aes(x = date, y = pct_change, color = state))
+```
+
+hmmm, a blank chart, not what we had in mind.
+
+
+# line chart
+
+```{r}
+hpi_pct %>% 
+  ggplot(aes(x = date, y = pct_change, color = state)) +
+  geom_line()
+  
+```
+
+# faceting 
+```{r}
+hpi_pct %>% 
+ggplot(aes(x = date, y = pct_change, color = state)) +
+  geom_line() +
+  # theme(plot.title = element_text(hjust = 0.5)
+  #       legend.position = "none",
+  #       axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  facet_wrap(~state, ncol = 3) +
+  labs(x = "", y = "better label", title = "good title") 
+```
+
+# scatter plot
+
+```{r}
+hpi_pct %>% 
+#  filter(state %in% c("ga", "ny", "fl")) %>% 
+ggplot(aes(x = pct_change_12_mons, y = pct_change, color = state)) +
+  geom_point() + #alpha = .5
+  #facet_wrap(~state, ncol = 10) +
+  labs(x = "", y = "better label", title = "scatter") +
+  theme(#legend.position = "none",
+        axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+        plot.title = element_text(hjust = 0.5))
+```
+
+# scatter with LM
+
+```{r}
+hpi_pct %>% 
+  filter(state %in% c("ga", "ny", "fl")) %>% 
+ggplot(aes(x = pct_change_12_mons, y = pct_change, color = state)) +
+  #geom_point() + #alpha = .5
+  geom_smooth(method = "lm", se = FALSE, color = "purple", size = 1) +
+  geom_point(alpha = .2) +
+  facet_wrap(~state, ncol = 3) +
+  labs(x = "", y = "better label", title = "scatter with lm") +
+  theme(#legend.position = "none",
+        axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+        plot.title = element_text(hjust = 0.5))
+```
+
+# Histogram
+
+```{r}
+hpi_pct %>% 
+  filter(state %in% c("ga", "ny", "fl")) %>% 
+  ggplot(aes(x = pct_change)) +
+  geom_histogram(color = "blue", fill = "pink", bins = 50) +
+  #facet_wrap(~state) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  theme_minimal()
+```
+
+# density
+
+```{r}
+hpi_pct %>% 
+  filter(state %in% c("ga", "ny", "fl")) %>% 
+  ggplot(aes(x = pct_change)) +
+  geom_density(color = "cornflowerblue") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  theme_minimal() 
+```
+
+# density and histogram
+
+```{r}
+hpi_pct %>% 
+  filter(state %in% c("ga", "ny", "fl")) %>% 
+  ggplot(aes(x = pct_change)) +
+  geom_histogram(color = "blue", fill = "pink", bins = 50) +
+  geom_density(color = "red") +
+  facet_wrap(~state) +
+  #geom_histogram(color = "blue", fill = "pink", bins = 50) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+```
+
+# create and save aesthetics
+
+```{r}
+
+my_aesthetics <- 
+  theme(plot.title = element_text(colour = "cornflowerblue"),  
+        strip.text.x = element_text(size = 8, colour = "white"), 
+        strip.background = element_rect(colour = "white", fill = "cornflowerblue"), 
+        axis.text.x = element_text(colour = "cornflowerblue"), 
+        axis.text = element_text(colour = "cornflowerblue"), 
+        axis.ticks.x = element_line(colour = "cornflowerblue"), 
+        axis.text.y = element_text(colour = "cornflowerblue"), 
+        axis.ticks.y = element_line(colour = "cornflowerblue"),
+        axis.title = element_text(colour = "cornflowerblue"),
+        legend.title = element_text(colour = "cornflowerblue"),
+        legend.text = element_text(colour = "cornflowerblue"))
+
+
+hpi_pct %>% 
+  filter(state %in% c("ga", "ny", "fl")) %>% 
+  ggplot(aes(x = pct_change_12_mons, y = pct_change, color = state)) +
+  geom_point() + #alpha = .5
+  #geom_smooth(method = "lm", se = TRUE, color = "purple", size = 1) +
+  facet_wrap(~state, ncol = 10) +
+  labs(x = "", y = "better label", title = "scatter with lm") +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+        plot.title = element_text(hjust = 0.5)) +
+  my_aesthetics
+```
+
+
+# Compare two states
+
+```{r}
+hpi_pct %>% 
+  filter(state == "fl"  | state == "ga" | state == "ca") %>% 
+  ggplot(aes(x = date, y = pct_change, color = state)) +
+  geom_line() +
+  scale_x_date(date_breaks = "3 years", 
+               date_labels = "%Y") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5),
+        plot.caption = element_text(hjust=0)) +
+  # labs()
+  ylab("") +
+  xlab("") +
+  ggtitle("Florida v. GA Housing Price appreciation", 
+          subtitle = "more info") +
+  labs(caption = "data source: fmac")
+```
+
+# Create a recessions shade object
+
+```{r}
+# recession plot
+recessions <- 
+tribble(
+  ~Peak, ~Trough,
+  "1948-11-01", "1949-10-01",
+  "1953-07-01", "1954-05-01",
+  "1957-08-01", "1958-04-01",
+  "1960-04-01", "1961-02-01",
+  "1969-12-01", "1970-11-01",
+  "1973-11-01", "1975-03-01",
+  "1980-01-01", "1980-07-01",
+  "1981-07-01", "1982-11-01",
+  "1990-07-01", "1991-03-01",
+  "2001-03-01", "2001-11-01",
+  "2007-12-01", "2009-06-01"
+  ) %>% 
+  mutate(Peak = ymd(Peak),
+         Trough = ymd(Trough))
+
+
+recession_shade <- 
+  geom_rect(data = recessions, 
+            inherit.aes = F, 
+            aes(xmin = Peak, 
+                xmax = Trough, 
+                ymin = -Inf, 
+                ymax = +Inf), 
+            fill = 'pink', 
+            alpha = 0.5)
+
+
+```
+
+# time series with recessions
+
+```{r, message=FALSE}
+hpi_pct %>% 
+  filter(state == "fl"  | state == "ga") %>% 
+  ggplot(aes(x = date, y = pct_change, color = state)) +
+  geom_line() +
+  scale_x_date(date_breaks = "2 years", 
+               date_labels = "%Y") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5),
+        plot.caption = element_text(hjust=0)) +
+  ylab("") +
+  xlab("") +
+  ggtitle("Florida v. GA Housing Price appreciation", 
+          subtitle = "more info") +
+  labs(caption = "data source: fmac") +
+  recession_shade +
+  xlim(min(hpi_pct$date), max(hpi_pct$date))
+```
+
+# columns custom colors
+
+```{r}
+hpi_pct %>% 
+  filter((state == "fl"  | state == "ga" ) & date > "2000-01-01") %>% 
+  mutate(pos_neg_col = case_when(pct_change < 0 ~ "pink", 
+                                 TRUE ~ "cornflowerblue")) %>% 
+  ggplot(aes(x = date, y = pct_change, color = pos_neg_col)) +
+  geom_col() +
+  scale_colour_identity() +
+  facet_wrap(~state)
+```
+
+# column chart ordered
+
+```{r}
+hpi_pct %>% 
+  summarise(mean_pct_change = mean(pct_change),
+            sd_pct_change = sd(pct_change),
+            min_pct_change = min(pct_change)) %>%
+  #arrange(desc(mean_pct_change)) %>% 
+  top_n(25) %>%  
+ggplot(aes(x = reorder(state, mean_pct_change) , y = mean_pct_change, fill = state)) +
+  geom_col(width = .5) +
+  geom_text(aes(label = state), nudge_y = .0001) +
+  theme(legend.position = "none",
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  labs(x = "") +
+  scale_y_continuous(labels = scales::percent) 
+
+```
+
+# repel labels
+
+```{r}
+library(ggrepel)
+hpi_pct %>% 
+  summarise(mean_pct_change = mean(pct_change),
+            sd_pct_change = sd(pct_change),
+            min_pct_change = min(pct_change)) %>%
+ arrange(desc(mean_pct_change)) %>% 
+  top_n(50) %>% 
+ggplot(aes(x = reorder(state, mean_pct_change), y = mean_pct_change, fill = state)) +
+  geom_col(width = .5) +
+  geom_text_repel(aes(label = state), nudge_y = .0001) +
+  theme(legend.position = "none",
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  labs(x = "") +
+  scale_y_continuous(labels = scales::percent) 
+```
+
+
+# Plotly
+
+```{r}
+library(plotly)
+ggplotly(
+hpi_pct %>% 
+  filter((state == "fl"  | state == "ga" )& date > "2010-01-01") %>% 
+  mutate(pos_neg_col = case_when(pct_change < 0 ~ "pink", 
+                                 TRUE ~ "cornflowerblue")) %>% 
+  ggplot(aes(x = date, y = pct_change, color = pos_neg_col)) +
+  geom_col() +
+  scale_colour_identity() +
+  facet_wrap(~state)
+)
+```
+
+```{r}
+ggplotly(
+hpi_pct %>% 
+  filter(state == "fl"  | state == "ga") %>% 
+  ggplot(aes(x = date, y = pct_change, color = state)) +
+  geom_line() +
+  scale_x_date(date_breaks = "2 years", 
+               date_labels = "%Y") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5),
+        plot.caption = element_text(hjust=0)) +
+  ylab("") +
+  xlab("") +
+  ggtitle("Florida v. GA Housing Price appreciation", 
+          subtitle = "more info") +
+  labs(caption = "data source: fmac") +
+  xlim(min(hpi_pct$date), max(hpi_pct$date))
+)
+```
+
+```{r}
+ggplotly(
+hpi_pct %>% 
+  filter(state %in% c("ga", "ny", "fl")) %>% 
+ggplot(aes(x = pct_change_12_mons, y = pct_change, color = state)) +
+  geom_point() + #alpha = .5
+  geom_smooth(method = "lm", se = TRUE, color = "purple", size = 1) +
+  facet_wrap(~state, ncol = 3) +
+  labs(x = "", y = "better label", title = "scatter with lm") +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+)
+```
+
+# Highcharter
+
+Doesn't have a smooth faceter but I like this pacakge and it's widely used in industry.
+
+```{r}
+hpi_pct %>% 
+  filter(state == "fl"  | state == "ga" | state == "ca") %>% 
+  hchart(., hcaes(x = date, y = pct_change, group = state), type = "scatter") %>% 
+  hc_title(text = "State HPIs") %>% 
+  hc_exporting(enabled = TRUE)
+```
+
+Highcharter and plotly are part of a family of R packages called htmlwidgets. They are wrappers for JavaScript libraries - a huge and growing part fo the R ecosystem are these data visualization capabilities. 
+
+
+# correlation plot
+
+```{r}
+library(corrplot)
+  hpi_pct %>% 
+  select(state, pct_change, date) %>% 
+  spread(state, pct_change) %>% 
+  select(-date) %>%
+  cor() %>% 
+  corrplot(method = "circle") # square, color, number, circle, ellipse
+```
+
+
+# gganimate
+
+```{r}
+library(gganimate)
+library(gifski)
+library(png)
+
+hpi_pct %>% 
+  filter(state == "fl"  | state == "ga") %>% 
+  ggplot(aes(x = date, y = pct_change, color = state)) +
+  geom_line() +
+  scale_x_date(date_breaks = "2 years", 
+               date_labels = "%Y") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5),
+        plot.caption = element_text(hjust=0)) +
+  ylab("") +
+  xlab("") +
+  ggtitle("Florida v. GA Housing Price appreciation", 
+          subtitle = "more info") +
+  labs(caption = "data source: fmac") +
+  recession_shade +
+  xlim(min(hpi_pct$date), max(hpi_pct$date)) +
+  transition_reveal(date)
+
+gganimate::anim_save("hpi-time.gif")
+```
+
+
+```{r}
+animate(
+hpi_pct %>% 
+  summarise(mean_pct_change = mean(pct_change),
+            sd_pct_change = sd(pct_change),
+            min_pct_change = min(pct_change)) %>%
+ggplot(aes(x = state, y = mean_pct_change, fill = state)) +
+  geom_col() +
+  geom_text_repel(aes(label = state), nudge_y = .0001) +
+  theme(legend.position = "none",
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  labs(x = "") +
+  scale_y_continuous(labels = scales::percent) +
+  transition_states(state, wrap = FALSE) +
+  shadow_mark(), 
+nframes = 103)
+```
+
+
+
+```{r}
+animate(
+hpi_pct %>% 
+  filter((state == "fl"  | state == "ga" )& date > "2010-01-01") %>% 
+  mutate(pos_neg_col = case_when(pct_change < 0 ~ "pink", 
+                                 TRUE ~ "cornflowerblue")) %>% 
+  ggplot(aes(x = date, y = pct_change, color = pos_neg_col)) +
+  geom_col() +
+  scale_colour_identity() +
+  facet_wrap(~state) +
+  transition_states(date, wrap = FALSE) +
+  shadow_mark(), 
+nframes = 300)
+```

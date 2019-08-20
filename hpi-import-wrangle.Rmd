@@ -1,0 +1,404 @@
+---
+title: "HPI Data"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+### What is R and RStudio? 
+
+R is an open-source statistical programming language that is growing very fast in the world of data science. 
+
+We are working on RStudio Cloud for this workshop, so you won't need to do anything to your own computer, but if you wish to do so: 
+
+To download R, go to: 
+
+https://cloud.r-project.org
+
+and then click on the link for either Mac, Windows or Linux depending on your computer. 
+
+To install RStudio, go to: 
+
+http://www.rstudio.com/download
+
+RStudio is an integrated development environment (or IDE) for R programming. It makes writing and running R code more fun. 
+
+If all of that is a bit confusing, have a look at this section from *R for Data Science*: 
+
+r4ds.had.co.nz/introduction.html#prerequisites
+
+
+### Packages
+
+R the programming language consists of base R and the packages that have been built on top of it. Once you have downloaded base R onto your computer and installed RStudio, you need to install the packages we will be using for this workshop.
+
+To install a package on your computer, run `install.packages("name of package")`. To use that package, place `library(name of package)` at the top of your R script or RMarkdown file and run it.
+
+
+### Rmarkdown
+
+The file we are looking at and using today is called an `RMarkdown` file. It's a file format that let's us interweave code chunks that look like this: 
+
+```{r}
+mtcars
+```
+
+Along with plain text prose, which is what we are reading right now. We can then `knit` this to a PDF, an HTML file or a Notebook. We could have used an R script, which would have the file extension `.R`. Click `file` -> `New File` -> `R Script` to open an R script. Click `file` -> `New File` -> `R Notebook` to open an Rmarkdown Notebook.
+
+### Load the packages
+
+All my R Notebooks start with this step. We need our tools! 
+
+If you are using R for the first time on this computer, you'll need to install all these packages to your machine.
+
+```{r setup, message = FALSE, warning = FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, comment = NA)
+
+# install.packages("tidyverse")
+# install.packaged("highcharter")
+# install.packages("corrr")
+# install.packages("plotly")
+# install.packages("scales")
+# install.packages("readxl")
+# install.packages("timetk")
+# install.packages("lubridate")
+# install.packages("janitor")
+# install.packages(xts)
+
+# 
+# for (pkg in c('tidyverse', 'plotly', 'highcharter', 'timetk', 'corrr', 'scales','readxl', 'janitor', 'lubridate', 'xts')) 
+#   if (!requireNamespace(pkg)) install.packages(pkg)
+
+library(tidyverse) 
+library(timetk)
+library(highcharter)
+library(readxl)
+library(corrr)
+library(scales)
+library(plotly)
+library(lubridate)
+library(janitor)
+
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, comment = NA)
+```
+
+
+What we will cover today:
+
+    + import an excel spreadsheet
+    + import a csv file
+    + Remove rows with slice()
+    + Pick columns by their names select()
+    + Pick observations by their values filter()
+    + Create new variables with functions of existing variables mutate()
+    + Reorder the rows arrange()
+    + rename columns with rename()
+    + summarise values with summarise()
+    + pull apart dates with separate()
+    + from wide to long, tidy format with gather() 
+    + group_by() changes the scope to operating group-by-group
+    + toggle from tibble to xts (and back)
+    + Hadley reckons this covers about 90% of data wrangling in tidyverse
+    + what is the %>% see http://uc-r.github.io/pipe
+    + %>%  is called the pipe operator because we pipe data from line to line
+    + readability, no unnecessary object creation, read it as 'and then'
+    
+Link to book R for Data Science
+https://r4ds.had.co.nz/
+
+Link to tidyverse
+https://www.tidyverse.org/packages/
+
+Link to lots more of my code and Shiny apps specific to portfolio management
+
+http://www.reproduciblefinance.com/
+
+# Import Data
+
+How, why, where did it come from? 
+
+Often this will involve grabbing data from internal databases, or from a repository set up by a vendor, or from someone emailing us excel and csv files.
+
+For today, we will import one local excel file, one local csv file and one internet file.
+
+Before getting to code, click on the file and notice how to use the `Import Dataset` button at the top right. This can be a huge time saver and it generates code for us!
+
+Always, always, paste the full code into the script. Future you will thank past you.
+
+
+### From local csv file: two ways
+
+This is a large file, 13.5 MBs. 
+
+We can use `read_csv()` from `readr`.
+
+```{r, eval = FALSE}
+library(readr)
+hpi_from_csv <- read_csv("path to your local csv", 
+    col_types = cols(GEO_Code = col_skip(), 
+        Index_NSA = col_skip()))
+
+```
+
+The latest package for fast import is called vroom. 
+
+```{r, eval = FALSE}
+library(vroom)
+hpi_vroomed <- vroom("path to your local csv", 
+    col_types = cols(GEO_Code = col_skip(), 
+        Index_NSA = col_skip()))
+```
+
+`vroom` is much faster! Still in development at RStudio but will eventually power `read_csv()`. 
+
+### From local excel file
+
+```{r, eval = FALSE}
+library(readxl)
+hpi_from_excel <- read_excel("path to your local excel file", 
+    skip = 5)
+
+
+```
+
+### From the internet
+
+From the internet or from local file, either way, RStudio needs a path to the excel or csv.
+
+```{r}
+library(readxl)
+url <- "http://www.freddiemac.com/fmac-resources/research/docs/State_and_US_SA.xls"
+destfile <- "State_and_US_SA.xls"
+curl::curl_download(url, destfile)
+
+states_hpi <- read_excel(destfile, col_types = c("text", 
+    "numeric", "numeric", "numeric", "numeric", 
+    "numeric", "numeric", "numeric", "numeric", 
+    "numeric", "numeric", "numeric", "numeric", 
+    "numeric", "numeric", "numeric", "numeric", 
+    "numeric", "numeric", "numeric", "numeric", 
+    "numeric", "numeric", "numeric", "numeric", 
+    "numeric", "numeric", "numeric", "numeric", 
+    "numeric", "numeric", "numeric", "numeric", 
+    "numeric", "numeric", "numeric", "numeric", 
+    "numeric", "numeric", "numeric", "numeric", 
+    "numeric", "numeric", "numeric", "numeric", 
+    "numeric", "numeric", "numeric", "numeric", 
+    "numeric", "numeric", "numeric", "numeric"), 
+    skip = 5)
+```
+
+Quick glance at the data
+
+```{r}
+states_hpi %>% 
+  glimpse()
+
+# states_hpi %>% 
+#   View()
+```
+
+I don't love these column names. Uppercase, spaces...not ideal. We'll see how to rename them quickly.
+
+### Data frames and tibbles
+
+```{r}
+states_hpi %>% 
+  class()
+```
+
+what is  a `tibble`? It's really just a data frame. People use these interchangeably.
+
+### What's that weird `%>%`?
+
+This is called the 'pipe' operator. It chains together our functions so we don't have to create new objects each time we do something. It will appear dozens of times today and by the end you'll be tired of seeing it. We can think of this as reading `and then`, it tells the code to keep processing and moving to the next function. 
+
+We think it makes code more readable and logical, and it saves us from having to create new variable at each line.
+
+
+### Wrangle data
+
+Key package is `dplyr`!
+
+We have our data object. Let's: 
+
+1. use `clean_names()` from `janitor` package to clean up column names
+2. use `slice()` from `dplyr` to delete or keep or select rows
+3. use `mutate()` from `dplyr` to create new column
+4. use `ymd()` and `parse_date_time` from `lubridate` to clean up the date
+5. use `select()` from `dplyr` to delete and choose columns
+6. use `contains()` to choose columns
+7. use `separate()` and `unite` to split and combine columns
+8. use `case_when()` to add labels, and `between` as a short cut for x >= & x <=
+10. use `arrange()` from `dplyr` for ascending and `arrange(desc())` for descinding
+11. use `rename()` from `dplyr` for  column renaming
+12. use `filter()` from `dplyr`to select by row values
+
+```{r}
+states_hpi_wrangled <- 
+  states_hpi %>% 
+  # clean up column names from janitor package
+  clean_names() %>% 
+  # remove rows
+  #slice(53) %>% 
+  # use slice to keep or remove rows
+  slice(1:535) %>%
+  #slice(-536:-550)
+  # hugely important line here, let's unpack it
+#lubridate package for working with dates
+  mutate(date = ymd(parse_date_time(month, "%Y%m"))) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  #select(date, month)
+  # use select to choose columns
+  #select(date, everything()) %>%
+  #select(-month) %>% 
+  select(date, contains("united"),  everything(), -month) %>% 
+  # use separate to break up columns
+  separate(date, into = c("year", "month"), sep = '-', convert = TRUE, remove = FALSE) %>% 
+  unite(yr_mon, year, month, sep = "/", remove = FALSE) %>% 
+  # add labels with case_when
+  mutate(season = case_when(between(month, 3, 5) ~ "spring",
+                            between(month, 6, 8) ~ "summer",
+                            between(month, 9, 11) ~ "fall",
+                            # between(month, 12, 2) ~ "winter" == won't work because there's no numbers between 12 and 2
+                            TRUE ~ "winter")) %>%
+  # use arrange to change the order
+  #arrange(desc(date)) %>% 
+  rename(wash_dc = dc) %>% 
+  filter(date >= "1990-01-01")
+
+
+# states_hpi %>% 
+#   tail(20)
+
+```
+
+### Tidy Data
+
+What is tidy data?
+
+
+https://tidyr.tidyverse.org/
+
+    + Each variable is in a column.
+    + Each observation is a row.
+    + Each value is a cell.
+
+simple definition == took Hadley two years!!
+    
+r4ds.had.co.nz/tidy-data.html
+
+Converting from wide to tidy is not intuitive. It takes practice and trial/error (at least, it took me a lot of practice and trial/error).
+
+1. use `gather()` from `tidyr` to make into long data
+2. `spread()` does the opposite
+3. Long data is easier for computers, wide is easier for humans
+4. Allows us to `group_by()` and scale our operations
+
+```{r}
+
+hpi_tidy <- 
+  states_hpi_wrangled %>% 
+  select(date, -season, ga, fl, ny, ca, nc, sc, tn, mn, ok) %>% 
+  # gather makes data long, or tidy
+  gather(state, hpi, -date) %>% 
+  group_by(state)
+
+hpi_untidied <- 
+  hpi_tidy %>% 
+  spread(state, hpi)
+```
+
+Why is tidy data so useful?
+
+Adding multiple columns. How would we do this with wide date? slowly and painfully
+
+```{r}
+hpi_tidy %>% 
+  mutate(pct_change = (hpi / lag(hpi)) - 1,
+         pct_change_12_mons = (hpi / lag(hpi, 12)) - 1,
+         pct_change_24_mons = (hpi / lag(hpi, 24)) - 1) %>% 
+  # See what happens if you remove the na.omit() line
+  na.omit() %>% 
+  slice(1)
+```
+
+Notice how `slice()` respects our `group_by`. The data frame is aware of our discrete groups.
+
+### Summarise data
+
+Calculating summary stats much more efficient with tidy data
+
+```{r}
+hpi_tidy %>% 
+ # group_by(state, season) %>% 
+  mutate(pct_change = (hpi / lag(hpi)) - 1) %>%
+  na.omit() %>% 
+  summarise(mean_pct_change = mean(pct_change),
+            sd_pct_change = sd(pct_change),
+            min_pct_change = min(pct_change))
+```
+
+We can add labels and count percentages by groups.
+
+```{r}
+hpi_tidy %>% 
+  group_by(state) %>% 
+  mutate(pct_change = (hpi / lag(hpi)) - 1) %>%
+  na.omit() %>%
+  mutate(change_label = case_when(pct_change > 0  ~ "positive",
+                                  pct_change <= 0  ~ "negative"
+                                  )) %>% 
+count(change_label) %>% 
+mutate(percent = n/sum(n))
+```
+
+### xts format
+
+What about an xts object? Let's use `tk_xts` to change our tibble to an `xts` object, then use `tk_tbl` to change back to a tibble.
+
+```{r}
+library(timetk)
+states_hpi_xts <- 
+  states_hpi_wrangled %>% 
+  select(date, ga, fl, ny, ca) %>% 
+  tk_xts(date_var = date)
+
+states_hpi_xts %>% 
+  head()
+
+# data frame, has a date column
+states_hpi_wrangled %>% 
+  select(date)  %>% 
+  head()
+
+library(xts)
+# xts has a date index
+states_hpi_xts %>% 
+  index() %>% 
+  head()
+
+# Back to tibble
+states_hpi_tibble <- 
+  states_hpi_xts %>% 
+  tk_tbl(preserve_index = TRUE, rename_index = "date")
+```
+
+### Packages that want xts
+
+```{r, eval = FALSE}
+# package that wants xts objects
+library(PerformanceAnalytics)
+library(TTR)
+library(roll)
+```
+
+### Tidyquant
+
+```{r, eval = FALSE}
+# package that wants xts objects
+library(tidyquant)
+```
+
+
