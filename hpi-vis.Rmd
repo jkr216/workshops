@@ -101,7 +101,7 @@ hpi_pct %>%
 
 ```{r}
 hpi_pct %>% 
-  ggplot(aes(x = date, y = pct_change, color = state))
+  ggplot()
  # ggplot(aes(x = date, y = pct_change, color = state))
 ```
 

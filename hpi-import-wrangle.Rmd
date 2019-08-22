@@ -135,7 +135,7 @@ We can use `read_csv()` from `readr`.
 
 ```{r, eval = FALSE}
 library(readr)
-hpi_from_csv <- read_csv("path to your local csv", 
+hpi_from_csv <- read_csv("~/Downloads/fmhpi_master_file.csv", 
     col_types = cols(GEO_Code = col_skip(), 
         Index_NSA = col_skip()))
 
@@ -145,7 +145,7 @@ The latest package for fast import is called vroom.
 
 ```{r, eval = FALSE}
 library(vroom)
-hpi_vroomed <- vroom("path to your local csv", 
+hpi_vroomed <- vroom("~/Downloads/fmhpi_master_file.csv", 
     col_types = cols(GEO_Code = col_skip(), 
         Index_NSA = col_skip()))
 ```
